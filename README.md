@@ -1,84 +1,49 @@
-# Accounting: Fixed Assets Core Module
+# Accounting fixed assets
 
-> This package is the authoritative, provider-neutral implementation of Fixed Assets. It owns domain behavior and data; optional API, Filament, Livewire, React, Vue, and Nuxt packages translate its public contracts for their surfaces.
+The `accounting-fixed-assets` package owns the tenant-scoped fixed-asset register. It provides categories, acquisition, capitalization, components, locations, custodians, asset books, supporting documents, disposal, archival, public queries, and post-commit domain events.
 
-[Software](https://liberusoftware.com) ·
-[Hosting](https://liberuhosting.com) ·
-[Services](https://liberuservices.com) ·
-[Liberu Group](https://liberugroup.com)
+## Installation
 
-![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white) ![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
-[![Latest release](https://img.shields.io/github/v/release/liberusoftware/module-accounting-fixed-assets?sort=semver)](https://github.com/liberusoftware/module-accounting-fixed-assets/releases/latest) [![Tests](https://github.com/liberusoftware/module-accounting-fixed-assets/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/liberusoftware/module-accounting-fixed-assets/actions/workflows/tests.yml)
-
-## Features
-
-- Fully compatible with **Laravel 13**, **PHP 8.5**, and **Pest 5**.
-- Built following the domain-driven design guidelines of the Liberu architecture.
-- Reusable, presenting a clean public contract and boundaries.
-- Adheres to the strict database, security, and authorization standards of Liberu.
-
-## Requirements
-
-- **PHP 8.5**
-- **Composer 2**
-- A supported database (e.g. MySQL, PostgreSQL, SQLite)
-
-## Quick start
-
-To install this package via Composer, run:
+Install the domain package and any presentation package required by the host application:
 
 ```bash
 composer require liberusoftware/module-accounting-fixed-assets
 ```
 
-## Documentation
+The package loads its migration automatically. The host must provide an authenticated team context for user-facing operations; the domain actions also accept an explicit `team_id` for trusted application workflows.
 
-- [Liberu Main Documentation](https://github.com/liberusoftware/documentation)
-- [Architecture & Standards Index](https://github.com/liberusoftware/documentation/tree/main/architecture)
+## Public boundary
 
-## Related Liberu Projects
+Mutations are exposed as one action per use case:
 
-| Project | Repository | Purpose |
-| --- | --- | --- |
-| **Boilerplate** | [liberusoftware/boilerplate-laravel](https://github.com/liberusoftware/boilerplate-laravel) | Shared Laravel application foundation and reference composition |
-| **CMS** | [liberu-cms/cms-laravel](https://github.com/liberu-cms/cms-laravel) | Structured content, publishing, media, multisite, and headless delivery |
-| **CRM** | [liberu-crm/crm-laravel](https://github.com/liberu-crm/crm-laravel) | Customer data, sales, marketing, service, and customer success |
-| **Billing** | [liberu-billing/billing-laravel](https://github.com/liberu-billing/billing-laravel) | Products, subscriptions, invoicing, payments, and provisioning |
-| **Accounting** | [liberu-accounting/accounting-laravel](https://github.com/liberu-accounting/accounting-laravel) | Ledgers, banking, tax, expenses, close, and financial reporting |
-| **Ecommerce** | [liberu-ecommerce/ecommerce-laravel](https://github.com/liberu-ecommerce/ecommerce-laravel) | Catalog, checkout, orders, fulfillment, returns, B2B, and omnichannel commerce |
-| **Control Panel** | [liberu-control-panel/control-panel-laravel](https://github.com/liberu-control-panel/control-panel-laravel) | Hosting, infrastructure, DNS, mail, databases, backups, and security operations |
-| **Automation** | [liberu-automation/automation-laravel](https://github.com/liberu-automation/automation-laravel) | Governed workflows, provider-neutral AI, approvals, and connectors |
+- `CreateCategory`, `AcquireAsset`, `UpdateAsset`, `CapitalizeAsset`, `DisposeAsset`, and `ArchiveAsset`;
+- `AddAssetComponent`, `AddAssetDocument`, `CreateLocation`, and `CreateCustodian`;
+- `AssignAssetLocation` and `AssignAssetCustodian`.
 
-## Security
+`AssetQuery` provides tenant/status-filtered pagination and register summaries. Actions enforce lifecycle invariants, duplicate references, team ownership, positive money/useful-life values, and closed-asset restrictions. Presentation packages must call these actions and must not write the owned tables directly.
 
-Please do not report security vulnerabilities through public GitHub issues.
-Follow our [Security Policy](https://github.com/liberusoftware/documentation/blob/main/architecture/SECURITY.md) for private reporting and supported versions.
+The package emits `AssetAcquired`, `AssetCapitalized`, `AssetComponentAdded`, `AssetDocumentAdded`, and `AssetDisposed` after the surrounding database transaction commits. Event payloads contain the affected public model and action-specific reference where applicable.
 
-## License
+## Data ownership and safety
 
-This project is open-source software. You may use, modify, and distribute it
-under the terms described in [LICENSE.md](LICENSE.md).
+All tables are prefixed `accounting_fixed_asset_` and belong exclusively to this package. Money is stored with two decimal places and every asset has an explicit ISO currency code. Location and custodian assignments are tenant checked. API consumers receive explicit resource attributes and money objects; Eloquent models are never serialized automatically.
 
-The linked license text is authoritative; this summary is not legal advice.
+Invalid transitions throw `InvalidAsset`. Authorization is registered through `AssetPolicy` and requires the authenticated user’s current team to match the asset tenant. API callers additionally receive concealment-safe responses for assets outside their current team.
 
-## Feedback and contributing
+## Presentation packages
 
-Feedback and contributions are welcome. You can help by reporting reproducible
-bugs, proposing focused enhancements, improving documentation or translations,
-and submitting tested code changes.
+- `module-accounting-fixed-assets-api` publishes `/api/v1/accounting/fixed-assets` and the versioned OpenAPI fragment under `openapi/v1/`.
+- `module-accounting-fixed-assets-filament` provides the opt-in Filament 5 resource/plugin.
+- `module-accounting-fixed-assets-livewire` provides the opt-in Livewire 4 asset register component alias `module-accounting-fixed-assets::assets`.
 
-Before contributing, please read [CONTRIBUTING.md](https://github.com/liberusoftware/documentation/blob/main/standards/CONTRIBUTING.md) and our
-[Code of Conduct](https://github.com/liberusoftware/documentation/blob/main/architecture/CODE_OF_CONDUCT.md). Search existing issues first, then use
-the appropriate issue template. Pull requests should explain the problem and
-approach, remain focused, include or update tests, pass the required workflows,
-and document user-visible or breaking changes.
+## Verification
 
-## Contributors
+From the host repository, run:
 
-Thank you to everyone who helps improve Liberu.
+```bash
+php artisan module:validate
+php artisan test tests/Feature/AccountingFixedAssetsTest.php --compact
+php -d memory_limit=512M vendor/bin/phpstan analyse modules/accounting-fixed-assets modules/accounting-fixed-assets-api modules/accounting-fixed-assets-filament modules/accounting-fixed-assets-livewire --no-progress
+```
 
-<a href="https://github.com/liberusoftware/module-accounting-fixed-assets/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=liberusoftware/module-accounting-fixed-assets" alt="Contributors to liberusoftware/module-accounting-fixed-assets">
-</a>
-
-[View the full contributors graph](https://github.com/liberusoftware/module-accounting-fixed-assets/graphs/contributors).
+The test suite covers the lifecycle, post-commit events, duplicate and invalid transitions, tenant-owned location/custodian records, API authentication, and tenant isolation.
